@@ -96,9 +96,9 @@ for(tt in 2:max_time){ # iterate over days
   
   # Add disease transitions
   
-  S_to_I <- rpois(3,lambda=pmax(beta*new_total[,"S"]*new_total[,"I"]/rowSums(new_total),0) ) # generate random infections (+ check lambda >=0)
+  S_to_I <- rpois(3,lambda=beta*new_total[,"S"]*new_total[,"I"]/rowSums(new_total) ) # generate random infections 
 
-  new_total[,"S"] <- new_total[,"S"] - S_to_I
+  new_total[,"S"] <- pmax(new_total[,"S"] - S_to_I,0)  # (+ check S >=0)
   new_total[,"I"] <- new_total[,"I"] + S_to_I
   
   # Births and deaths into different compartments
