@@ -1,6 +1,13 @@
+# Version 2 - working version
+
 library(tidyverse)
 
 setwd("/Users/sonnybacigalupo/Documents/GitHub/asf-wild-boar")
+
+# User define wd
+if(Sys.info()["user"]=="adamkuchars" | Sys.info()["user"]=="akucharski" | Sys.info()["user"]=="adamkucharski") {
+  setwd("~/Documents/GitHub/asf-wild-boar/")
+}
 
 
 # Set up model parameters ------------------------------------------------------------
@@ -19,10 +26,10 @@ c_trace_tab<- array(NA,dim=c(length(1:max_time),n.patch,n.state),dimnames=list(N
 
 # Initial conditions
 init_pop_s <- rep(0,n.patch)
-init_pop_s[1] <- 950  # Number of susceptible
+init_pop_s[1] <- 1000  # Number of susceptible
 
 init_pop_i <- rep(0,n.patch)
-init_pop_i[1] <- 50  # Number of infected
+init_pop_i[1] <- 10  # Number of infected
 
 c_trace_tab[1,,"S"] <- init_pop_s # Set number of susceptible in forest
 c_trace_tab[1,,"I"] <- init_pop_i # Set number of infected in forest
@@ -31,7 +38,8 @@ c_trace_tab[1,"forest","S"] # Check numbers
 c_trace_tab[1,"forest","I"] 
 
 # Transmission rate  (i.e. R0*gamma)
-beta <- 0.01
+beta <-0.22
+infection_death <- 1/5 # 5 day lifespan
 
 # Read in movement data (per week)
 move_data <- read_csv("move_matrix.csv",col_names = T) %>% as.matrix.data.frame()
@@ -97,9 +105,10 @@ for(tt in 2:max_time){ # iterate over days
   # Add disease transitions
   
   S_to_I <- rpois(3,lambda=beta*new_total[,"S"]*new_total[,"I"]/rowSums(new_total) ) # generate random infections 
-
+  I_to_death <- rpois(3,lambda=infection_death*new_total[,"I"] ) # generate random infections 
+  
   new_total[,"S"] <- pmax(new_total[,"S"] - S_to_I,0)  # (+ check S >=0)
-  new_total[,"I"] <- new_total[,"I"] + S_to_I
+  new_total[,"I"] <- new_total[,"I"] + S_to_I - I_to_death
   
   # Births and deaths into different compartments
   scaled_births_with_carrying_capacity <- birth_per_capita*pmax(0,(1-new_total[,"S"]/carrying_capacity) ) # Calculate birth rate, scaling to reduce as nearer carrying capacity
@@ -130,7 +139,7 @@ c_trace_tab[1:5,,"I"]
 
 plot(c_trace_tab[,,],col="white", 
      main = "Movements of Susceptible and Infected Populations", xlab = "Days", ylab = "Number of individuals", 
-     xlim=c(0,max_time),ylim=c(1,3e3))
+     xlim=c(0,max_time),ylim=c(1,1e2))
 
 col_pick_s <- list("green","royalblue","red")
 col_pick_i <- list("olivedrab3","skyblue","indianred1")
