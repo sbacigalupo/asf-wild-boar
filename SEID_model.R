@@ -17,7 +17,7 @@ if(Sys.info()["user"]=="adamkuchars" | Sys.info()["user"]=="akucharski" | Sys.in
 n_population <- 3
 max_time <- 365 # in days
 
-# Setting up an array
+# Setting up an array 
 
 patchNames=c("forest","border","outside")
 stateNames=c("S","E","I","D")
