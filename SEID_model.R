@@ -17,6 +17,17 @@ if(Sys.info()["user"]=="adamkuchars" | Sys.info()["user"]=="akucharski" | Sys.in
 n_population <- 3
 max_time <- 365 # in days
 
+# Set areas
+
+# Inside forest
+area_f <- 38 # pi*3.5km(r)squared
+
+# Border area 
+area_b <- 25 # pi*4.5^2 minus the above
+
+# Outside forest
+area_o <- 190 # pi*9^2 minus the above
+
 # Setting up an array 
 
 patchNames=c("forest","border","outside")
@@ -33,12 +44,12 @@ o_trace_tab<- array(NA,dim=c(length(1:max_time),n.patch,n.output),dimnames=list(
 
 # Initial conditions
 init_pop_s <- rep(0,n.patch)
-init_pop_s[1] <- 800 # Number of susceptible in forest
-init_pop_s[2] <- 160 # Number of susceptible at border
-init_pop_s[3] <- 40  # Number of susceptible outside forest
+init_pop_s[1] <- 1200 # Number of susceptible in forest
+init_pop_s[2] <- 240 # Number of susceptible at border
+init_pop_s[3] <- 60  # Number of susceptible outside forest
 
 init_pop_e <- rep(0,n.patch)
-init_pop_e[1] <- 1  # Number of pre-infectious
+init_pop_e[1] <- 0  # Number of pre-infectious
 
 init_pop_i <- rep(0,n.patch)
 init_pop_i[1] <- 1  # Number of infectious
@@ -61,14 +72,14 @@ c_trace_tab[1,"forest","D"]
 
 # Transmission rate  (i.e. R0*gamma)
 
-beta <-0.75        # density dependent would be contact rate*transmission rate
+beta <-0.75/1500        # density dependent would be contact rate*transmission rate
 
-beta_wbp <- 1/30 # Contact rate between wild boar and farm (1 visit per 30 days per 1500 wild boar)
+beta_wbp <- 1/30/1500 # Contact rate between wild boar and farm (1 visit per 30 days per 1500 wild boar)
                      # assumes 100% transmission at the moment
 
 zeta <- 1/7 # Pre-infectious to infectious (latent period) 7 days
 
-infection_death <- 1/5 # 5 day lifespan
+infection_death <- 1/10 # 5 day lifespan
 
 # Read in movement data (per week)
 move_data <- read_csv("move_matrix.csv",col_names = T) %>% as.matrix.data.frame()
@@ -83,9 +94,13 @@ move_data_daily_0 <- move_data_daily_0/colSums(move_data_daily_0)
 # Set up birth, death parameters per day
 birth_per_capita <- 0.45*5/365 # Assumes 90% of females (50% of population) have 5 piglets per year
 cull_probability <- 0.5/365
-death_probability <- (0.1/365 + cull_probability) # Assumes lifespan 10 years
-carrying_capacity <- c(1e4,100,1e5) # How many boar sustainable in different areas
+death_probability <- (1/365 + cull_probability) # Assumes lifespan 10 years
+carrying_capacity <- c(1e4,300,1e5) # How many boar sustainable in different areas
 daily_sd_movement <- 0.4 # Daily measure of variation in movement
+a <- 0.6 # constant for density dependent growth
+growth_rate = birth_per_capita - death_probability
+
+
 
 
 
@@ -136,7 +151,7 @@ for(tt in 2:max_time){ # iterate over days
   # Add disease transitions
   # removed /rowSums(new_total) from line 120
   
-  S_to_E <- rpois(3,lambda=beta*new_total[,"S"]*new_total[,"I"]/rowSums(new_total) ) # generate random infections 
+  S_to_E <- rpois(3,lambda=beta*new_total[,"S"]*new_total[,"I"] ) # generate random infections 
   E_to_I <- rpois(3, lambda = zeta*new_total[,"E"])
   I_to_death <- rpois(3,lambda=infection_death*new_total[,"I"] ) # death rate
   
@@ -145,15 +160,30 @@ for(tt in 2:max_time){ # iterate over days
   new_total[,"I"] <- pmax(new_total[,"I"] + E_to_I - I_to_death,0)
   new_total[,"D"] <- new_total[,"D"] + I_to_death
   
-  
   # Births and deaths into different compartments
-  scaled_births_with_carrying_capacity <- birth_per_capita*pmax(0,(1-new_total[,"S"]/carrying_capacity) ) # Calculate birth rate, scaling to reduce as nearer carrying capacity
-  new_births_S<- rpois(n_population,lambda = new_total[,"S"]*scaled_births_with_carrying_capacity) # Add Poisson births
+#  scaled_births_with_carrying_capacity <- birth_per_capita*pmax(0,(1-new_total[,"S"]/carrying_capacity) ) # Calculate birth rate, scaling to reduce as nearer carrying capacity
+#  new_births_S<- rpois(n_population,lambda = new_total[,"S"]*scaled_births_with_carrying_capacity) # Add Poisson births
   
-  new_deaths_S <- rbinom(n_population,size=new_total[,"S"],prob=death_probability) # Add deaths
-  new_deaths_E <- rbinom(n_population,size=new_total[,"E"],prob=death_probability) # Add deaths
-  new_deaths_I <- rbinom(n_population,size=new_total[,"I"],prob=death_probability) # Add deaths
+  # Add deaths
+#  new_deaths_S <- rbinom(n_population,size=new_total[,"S"],prob=death_probability) # Add deaths
+#  new_deaths_E <- rbinom(n_population,size=new_total[,"E"],prob=death_probability) # Add deaths
+#  new_deaths_I <- rbinom(n_population,size=new_total[,"I"],prob=death_probability) # Add deaths
+  
+  
+  # Density dependent coefficients
+  
+  density_dependent_birth_coeff <- (a*growth_rate*new_total/carrying_capacity)# *new_total  # if doesn't run, remove hash here and line below. remove *total from new_
 
+  density_dependent_death_coeff <- ((1-a)*growth_rate*new_total/carrying_capacity)#*new_total 
+  
+  new_births_S <- round((birth_per_capita - density_dependent_birth_coeff[,"S"])*new_total[,"S"], digits = 0)
+  
+  new_deaths_S <- round((rbinom(n_population,size=new_total[,"S"],prob=death_probability + density_dependent_death_coeff[,"S"])), digits=0) # Add deaths
+  new_deaths_E <- round((rbinom(n_population,size=new_total[,"E"],prob=death_probability + density_dependent_death_coeff[,"E"])), digits=0) # Add deaths
+  new_deaths_I <- round((rbinom(n_population,size=new_total[,"I"],prob=death_probability + density_dependent_death_coeff[,"I"])), digits=0) # Add deaths
+
+  # might need to add new growth rate for next iteration based on actual difference in rates
+  
   # Store new populations
   c_trace_tab[tt,,"S"] <- new_total[,"S"] + new_births_S - new_deaths_S # Add births and subtract deaths from total
   c_trace_tab[tt,,"E"] <- new_total[,"E"]  - new_deaths_E # Subtract deaths from total
@@ -188,7 +218,7 @@ c_trace_tab[1:5,,"E"]
 
 c_trace_tab[1:5,,"I"]
 
-c_trace_tab[1:30,,"D"]
+c_trace_tab[1:5,,"D"]
 
 #c_trace_tab[1:30,,"FOI"]
 
