@@ -9,7 +9,7 @@ if(Sys.info()["user"]=="adamkuchars" | Sys.info()["user"]=="akucharski" | Sys.in
 
 # Set local path ----------------------------------------------
 wdir <- getwd()
-
+   
 # Run simulation model ----------------------------------------------
 # For each function, outputs are saved in 'dir_pick' directory.
 
