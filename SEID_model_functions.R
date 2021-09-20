@@ -1,4 +1,4 @@
-outbreak <- function(max_time,beta,beta_wbp,zeta,infection_death){
+outbreak <- function(max_time, beta,beta_wbp,zeta,infection_death){
   # Set up model parameters ------------------------------------------------------------
   
   #Set up numbers
@@ -8,16 +8,14 @@ outbreak <- function(max_time,beta,beta_wbp,zeta,infection_death){
   
   
   patchNames=c("forest","border","outside")
-  stateNames=c("S","E","I","D")
+  stateNames=c("S","E","I","D","prob_wb_wb","prob_wb_p")
   n.patch=length(patchNames)
   n.state=length(stateNames)
-  c_trace_tab<- array(NA,dim=c(length(1:max_time),n.patch,n.state),dimnames=list(NULL,patchNames,stateNames))
+  c_trace_tab<- array(dim=c(length(1:max_time),n.patch,n.state),dimnames=list(NULL,patchNames,stateNames))
   
   # Setting up an array for force of infection and other outputs
   
-  outputNames=c("i_force","prob_wb_wb", "boar-pig_inf" ,"prob_wb_p")
-  n.output=length(outputNames)
-  o_trace_tab<- array(NA,dim=c(length(1:max_time),n.patch,n.output),dimnames=list(NULL,patchNames,outputNames))
+
   
   # Initial conditions
   init_pop_s <- rep(0,n.patch)
@@ -34,13 +32,20 @@ outbreak <- function(max_time,beta,beta_wbp,zeta,infection_death){
   init_pop_d <- rep(0,n.patch)
   init_pop_d[1] <- 0  # Number of dead
   
-  init_foi <- rep(0,n.patch)
-  o_trace_tab[1,,] <- init_foi
+  init_prob_wb <- rep(0,n.patch)
+  init_prob_wb[1] <- 0  # Number of dead
   
+  init_prob_p <- rep(0,n.patch)
+  init_prob_p[1] <- 0  # Number of dead
+  
+
+
   c_trace_tab[1,,"S"] <- init_pop_s # Set number of susceptible in forest
   c_trace_tab[1,,"E"] <- init_pop_e # Set number of pre-infectious in forest
   c_trace_tab[1,,"I"] <- init_pop_i # Set number of infectious in forest
-  c_trace_tab[1,,"D"] <- init_pop_d # Set number of infectious in forest
+  c_trace_tab[1,,"D"] <- init_pop_d # Set number of dead in forest
+  c_trace_tab[1,,"prob_wb_wb"] <- init_prob_wb # Set number of dead in forest
+  c_trace_tab[1,,"prob_wb_p"] <- init_prob_p # Set number of dead in forest
   
   # Read in movement data (per week)
   
@@ -144,57 +149,40 @@ outbreak <- function(max_time,beta,beta_wbp,zeta,infection_death){
     c_trace_tab[tt,,"I"] <- new_total[,"I"]  - new_deaths_I # Subtract deaths from total
     c_trace_tab[tt,,"D"] <- new_total[,"D"]
     
-    # Calculate force of infection
+    inf_force_wb <- beta*c_trace_tab[tt,,"I"]       # Force of infection between wild boar in each area
     
-    outputs_tt <- o_trace_tab[tt-1,,] # Values at the start of the day
-    new_outputs <- outputs_tt         # Matrix to store new values
+    prob_wb <- 1 - (exp(-inf_force_wb*1))
     
-    foi <- beta*new_total[,"I"]       # Force of infection between wild boar in each area
+    inf_force_pig <- beta_wbp*c_trace_tab[tt,,"I"]  # Force of infection from wild boar on farm
     
-    prob_wb <- 1 - (exp(-foi*1))
+    prob_pig <- (inf_force_pig*1)
+  
+    c_trace_tab[tt,,"prob_wb_wb"] <- prob_wb
+    c_trace_tab[tt,,"prob_wb_p"] <- prob_pig
     
-    wb_p <- beta_wbp*new_total[,"I"]  # Force of infection from wild boar on farm
     
-    prob_wbp <- (wb_p*1)
-    
-    new_outputs[,"i_force"] <- foi
-    new_outputs[,"prob_wb_wb"] <- prob_wb
-    new_outputs[,"boar-pig_inf"] <- wb_p
-    new_outputs[,"prob_wb_p"] <- prob_wbp
-    
-    o_trace_tab[tt,,"i_force"] <- new_outputs[,"i_force"]
-    o_trace_tab[tt,,"boar-pig_inf"] <- new_outputs[,"boar-pig_inf"]
-    o_trace_tab[tt,,"prob_wb_wb"] <- new_outputs[,"prob_wb_wb"]
-    o_trace_tab[tt,,"prob_wb_p"] <- new_outputs[,"prob_wb_p"]
   }
   
-  trace_tabs <- list("populations" = c_trace_tab,"outputs" = o_trace_tab)
-  return(trace_tabs)
+  
+#  Model<-list(array(NA,dim=c(n_run_pick,length(max_time)),dimnames=list(NULL,NULL)))
+  
+#  return(Model)
+  
+  return("c_trace_tab" = c_trace_tab)
 }
 
 
 
-
-###########################################################
-##
-## Plot individual run
-##
-###########################################################
-
-
-
-
   # Plot outputs by n.patch
-  plot_outbreak <- function(n_run,scenario){
+  plot_outbreak <- function(n_run){
     
-    pop_trace <- list_pop[[n_run]]
-    output_trace <- list_output[[n_run]]
+    pop_trace <- store[n_run,,,]
     
     max_time <- length(pop_trace[,1,"S"])
     n.state <- length(pop_trace[1,"forest",])
     n.patch <- length(pop_trace[1,,"S"])
     
-    par(mfrow=c(3,2), oma = c(0, 0, 1, 0))
+    par(mfrow=c(3,2))
     
   
     col_pick_states <- list("blue","orange","red","black")
@@ -205,7 +193,7 @@ outbreak <- function(max_time,beta,beta_wbp,zeta,infection_death){
           xlim=c(0,max_time),ylim=c(1,max(pop_trace[,"forest",])))
       
       
-      for(dd in 1:n.state){
+      for(dd in 1:4){
         lines(pop_trace[,"forest",dd],col=col_pick_states[[dd]])
       }
     }
@@ -214,7 +202,7 @@ outbreak <- function(max_time,beta,beta_wbp,zeta,infection_death){
           main = "Wild boar numbers at the border", xlab = "Days", ylab = "Number of individuals", 
           xlim=c(0,max_time),ylim=c(1,max(pop_trace[,"border",])))
       
-      for(dd in 1:n.state){
+      for(dd in 1:4){
         lines(pop_trace[,"border",dd],col=col_pick_states[[dd]])
       }
     }
@@ -223,7 +211,7 @@ outbreak <- function(max_time,beta,beta_wbp,zeta,infection_death){
           main = "Wild boar numbers outside the forest", xlab = "Days", ylab = "Number of individuals", 
           xlim=c(0,max_time),ylim=c(1,max(pop_trace[,"outside",])))
       
-      for(dd in 1:n.state){
+      for(dd in 1:4){
         lines(pop_trace[,"outside",dd],col=col_pick_states[[dd]])
       }
       
@@ -232,34 +220,34 @@ outbreak <- function(max_time,beta,beta_wbp,zeta,infection_death){
             xlim=c(0,max_time),ylim=c(1,max(pop_trace[,"outside",])))
         
         legend("center",legend = c("susceptible","pre-infectious","infectious","dead"), 
-               col = c("blue","orange","red","black","white","white","white"), lty = 1, border = "black", cex=1)
+               col = c("blue","orange","red","black"), lty = 1, border = "black", cex=1)
       }
     }
     
-    {plot(output_trace[,,],col="white", 
-          main = "Probability of infection between \nwild boar over time", xlab = "Days", ylab = "Likelihood of infection", 
+    {plot(pop_trace[,,],col="white", 
+          main = "Probability of infection between \nwild boar over time", xlab = "Days", ylab = "Probability of infection", 
           xlim=c(0,max_time),
-          ylim=c(0,max(output_trace[,,"prob_wb_wb"])))
+          ylim=c(0,max(pop_trace[,,"prob_wb_wb"])))
       legend("topright", legend = c("inside","border","outside"), 
              col = c("darkgreen","brown","orange"), lty = 1, border = "black", cex=1)
       
       
-      for(dd in 1:n.patch){
-        lines(output_trace[,dd,"prob_wb_wb"],col=col_pick_patch[[dd]])
+      for(ee in 1:n.patch){
+        lines(pop_trace[,ee,"prob_wb_wb"],col=col_pick_patch[[ee]])
       }
     }
-    {plot(output_trace[,,],col="white", 
-          main = "Probability of infection between \nwild boar and pigs over time", xlab = "Days", ylab = "Force of infection", 
+    {plot(pop_trace[,,],col="white", 
+          main = "Probability of infection between \nwild boar and pigs over time", xlab = "Days", ylab = "Probability of infection", 
           xlim=c(0,max_time),
-          ylim=c(0,max(output_trace[,,"prob_wb_p"])))
+          ylim=c(0,max(pop_trace[,,"prob_wb_p"])))
       legend("topright", legend = c("inside","border","outside"), 
              col = c("darkgreen","brown","orange"), lty = 1, border = "black", cex=1)
       
       
-      for(dd in 1:n.patch){
-        lines(output_trace[,dd,"prob_wb_p"],col=col_pick_patch[[dd]])
+      for(ee in 1:n.patch){
+        lines(pop_trace[,ee,"prob_wb_p"],col=col_pick_patch[[ee]])
       }
-      mtext(paste0("Run ",n_run,"  (B_wb=",scenario[["beta"]],";  B_p=",signif(scenario[["beta_wbp"]], digits = 3),";  z(tEI)=",signif(scenario[["zeta"]], digits = 3),";  y(tID)=",signif(scenario[["infection_death"]], digits = 3),")"), line = -1, cex = 0.85, outer = TRUE)
+      mtext(paste0("Run ",n_run), line = -1, cex = 0.85, outer = TRUE)
     }
   }
   
@@ -270,24 +258,24 @@ outbreak <- function(max_time,beta,beta_wbp,zeta,infection_death){
   ##
   ###########################################################
   
-infect_pig <- function(n_runs){
+infect_pig <- function(n_run){
   store_table <- NULL
-  store_r <- NULL
-  for(jj in 1:n_runs){
-  output_trace <- list_output[[jj]]
-  infectpig_F <- sum(output_trace[,"forest","prob_wb_p"])
-  infectpig_B <- sum(output_trace[,"border","prob_wb_p"])
-  infectpig_O <- sum(output_trace[,"outside","prob_wb_p"])
-  store_r<-rbind(store_r,c(jj,infectpig_F,infectpig_B,infectpig_O))
+  store_infectpig <- NULL
+  for(jj in 1:n_run){
+  pop_trace <- store[jj,,,]
+  infectpig_F <- sum(pop_trace[,"forest","prob_wb_p"])
+  infectpig_B <- sum(pop_trace[,"border","prob_wb_p"])
+  infectpig_O <- sum(pop_trace[,"outside","prob_wb_p"])
+  store_infectpig<-rbind(store_infectpig,c(jj,infectpig_F,infectpig_B,infectpig_O))
   }
-  store_r <- as_tibble(store_r)
-  names(store_r) <- c("run","infectpig_F","infectpig_B","infectpig_O")
+  store_infectpig <- as_tibble(store_infectpig)
+  names(store_infectpig) <- c("run","infectpig_F","infectpig_B","infectpig_O")
   
-#  write_csv(store_r,paste0("rstore.csv"))
+  write_csv(store_infectpig,paste0("store_infectpig.csv"))
   
-  store_table <- rbind(store_table,c(median(store_r$infectpig_F),quantile(store_r$infectpig_F,c(0.025,0.975)),
-                                     median(store_r$infectpig_B),quantile(store_r$infectpig_B,c(0.025,0.975)),
-                                     median(store_r$infectpig_O),quantile(store_r$infectpig_O,c(0.025,0.975))))
+  store_table <- rbind(store_table,c(median(store_infectpig$infectpig_F),quantile(store_infectpig$infectpig_F,c(0.025,0.975)),
+                                     median(store_infectpig$infectpig_B),quantile(store_infectpig$infectpig_B,c(0.025,0.975)),
+                                     median(store_infectpig$infectpig_O),quantile(store_infectpig$infectpig_O,c(0.025,0.975))))
   
   # Convert
   store_table <- as_tibble(store_table)
@@ -304,7 +292,7 @@ infect_pig <- function(n_runs){
   store_table$infectpig_O_95_1 <- as.numeric(store_table$infectpig_O_95_1)
   store_table$infectpig_O_95_2 <- as.numeric(store_table$infectpig_O_95_2)
   
-  # write_csv(store_table,paste0("testresults1.csv"))
+  write_csv(store_table,paste0("median_infectpig.csv"))
 }
 
 ###########################################################
@@ -313,23 +301,23 @@ infect_pig <- function(n_runs){
 ##
 ###########################################################
 
-size <- function(n_runs){
+size <- function(n_run){
   store_table <- NULL
-  store_r <- NULL
-  for(kk in 1:n_runs){
-    pop_trace <- list_pop[[kk]]
+  store_size <- NULL
+  for(kk in 1:n_run){
+    pop_trace <- store[kk,,,]
     outbreak_size <- sum(max(pop_trace[,"forest","D"]),
                          max(pop_trace[,"border","D"]),
                          max(pop_trace[,"outside","D"]))
     
-    store_r<-rbind(store_r,c(kk,outbreak_size))
+    store_size<-rbind(store_size,c(kk,outbreak_size))
   }
-  store_r <- as_tibble(store_r)
-  names(store_r) <- c("run","outbreak_size")
+  store_size <- as_tibble(store_size)
+  names(store_size) <- c("run","outbreak_size")
   
-    write_csv(store_r,paste0("rstore.csv"))
+    write_csv(store_size,paste0("store_size.csv"))
   
-  store_table <- rbind(store_table,c(median(store_r$outbreak_size),quantile(store_r$outbreak_size,c(0.025,0.975))))
+  store_table <- rbind(store_table,c(median(store_size$outbreak_size),quantile(store_size$outbreak_size,c(0.025,0.975))))
   
   # Convert
   store_table <- as_tibble(store_table)
@@ -339,7 +327,7 @@ size <- function(n_runs){
   store_table$outbreak_size_95_2 <- as.numeric(store_table$outbreak_size_95_2)
 
   
-   write_csv(store_table,paste0("testresults2.csv"))
+   write_csv(store_table,paste0("median_size.csv"))
 }
   
     
