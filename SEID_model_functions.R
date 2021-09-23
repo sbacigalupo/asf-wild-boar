@@ -1,11 +1,14 @@
-outbreak <- function(max_time, beta,beta_wbp,zeta,infection_death){
+outbreak <- function(beta){
   # Set up model parameters ------------------------------------------------------------
   
   #Set up numbers
   n_population <- 3
   
   # Setting up an array 
-  
+  max_time =365
+  beta_wbp = 1/30/1500
+  zeta = 1/7
+  infection_death = 1/10
   
   patchNames=c("forest","border","outside")
   stateNames=c("S","E","I","D","prob_wb_wb","prob_wb_p")
@@ -100,11 +103,11 @@ outbreak <- function(max_time, beta,beta_wbp,zeta,infection_death){
       
       pop_b_to_f <- rbinom(1,  pop_time_tt[2,pick_p],move_data_daily[1,2]) # How many go to in forest
       pop_b_to_b <- rbinom(1,  pop_time_tt[2,pick_p]-pop_b_to_f,move_data_daily[2,2]/(move_data_daily[2,2]+move_data_daily[3,2])) # Of rest, how many stay
-      pop_b_to_o <- as.integer(pop_time_tt[2,pick_p] - pop_b_to_f - pop_b_to_b) # The rest must stay outside
+      pop_b_to_o <- as.integer(pop_time_tt[2,pick_p] - pop_b_to_f - pop_b_to_b) # The rest must go outside
       
       pop_o_to_f <- rbinom(1,  pop_time_tt[3,pick_p],move_data_daily[1,3]) # How many go to forest
       pop_o_to_b <- rbinom(1,  pop_time_tt[3,pick_p]-pop_o_to_f,move_data_daily[2,3]/(move_data_daily[2,3]+move_data_daily[3,3])) # Of rest, how many go to border
-      pop_o_to_o <- as.integer(pop_time_tt[3,pick_p] - pop_o_to_f - pop_o_to_b) # The rest must go to outside
+      pop_o_to_o <- as.integer(pop_time_tt[3,pick_p] - pop_o_to_f - pop_o_to_b) # The rest must stay outside
       
       # Tally up new populations after movement
       new_pop_f <- pop_f_to_f+pop_b_to_f+pop_o_to_f
@@ -144,9 +147,9 @@ outbreak <- function(max_time, beta,beta_wbp,zeta,infection_death){
     # might need to add new growth rate for next iteration based on actual difference in rates
     
     # Store new populations
-    c_trace_tab[tt,,"S"] <- new_total[,"S"] + new_births_S - new_deaths_S # Add births and subtract deaths from total
-    c_trace_tab[tt,,"E"] <- new_total[,"E"]  - new_deaths_E # Subtract deaths from total
-    c_trace_tab[tt,,"I"] <- new_total[,"I"]  - new_deaths_I # Subtract deaths from total
+    c_trace_tab[tt,,"S"] <- pmax(new_total[,"S"] + new_births_S - new_deaths_S,0) # Add births and subtract deaths from total
+    c_trace_tab[tt,,"E"] <- pmax(new_total[,"E"]  - new_deaths_E,0) # Subtract deaths from total
+    c_trace_tab[tt,,"I"] <- pmax(new_total[,"I"]  - new_deaths_I,0) # Subtract deaths from total
     c_trace_tab[tt,,"D"] <- new_total[,"D"]
     
     inf_force_wb <- beta*c_trace_tab[tt,,"I"]       # Force of infection between wild boar in each area
@@ -178,7 +181,7 @@ outbreak <- function(max_time, beta,beta_wbp,zeta,infection_death){
     
     pop_trace <- store[n_run,,,]
     
-    max_time <- length(pop_trace[,1,"S"])
+    max_time <- length(pop_trace[,"forest","S"])
     n.state <- length(pop_trace[1,"forest",])
     n.patch <- length(pop_trace[1,,"S"])
     
