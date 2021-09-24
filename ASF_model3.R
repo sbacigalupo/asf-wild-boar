@@ -41,19 +41,26 @@ for(ii in 1:n_run_pick){
   store[ii,,,] = model
 }
 
-beta_range <- seq(0.7,2.2,0.3)
-List <- list()
 
-for(mm in beta_range){
-for(ii in 1:n_run_pick){
-  store[,ii,,,] <- outbreak(
-    beta = mm
-  )
-}
-  List[[mm]] <- model
-}
+beta_range <- c(0.7,2) #seq(0.7,2.2,0.3)
+store_beta <- array(dim=c(length(beta_range),length(1:n_run_pick),length(1:365),n.patch,n.state),dimnames=list(NULL,NULL, NULL,patchNames,stateNames))
 
-store["beta 0.7",2,1:10,,"S"]
+# Loop over beta
+for(mm in 1:length(beta_range)){
+  # Loop over runs
+  for(ii in 1:n_run_pick){
+    model_ii <- outbreak(
+      beta = beta_range[mm]/1500
+    )
+  store[mm,ii,,,] <- model_ii
+  } # End loop runs
+} # End loop beta
+
+
+# Check debugs
+model_ii[,"forest","S"]
+
+store[1,2,1:10,,"S"]
 
 # Plot wild boar numbers and infection probability in single outbreak
 
