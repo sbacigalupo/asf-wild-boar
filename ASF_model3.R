@@ -42,6 +42,9 @@ for(ii in 1:n_run_pick){
 }
 
 
+
+# Analyse different beta values -------------------------------------------
+
 beta_range <- c(0.7,2) #seq(0.7,2.2,0.3)
 store_beta <- array(dim=c(length(beta_range),length(1:n_run_pick),length(1:365),n.patch,n.state),dimnames=list(NULL,NULL, NULL,patchNames,stateNames))
 
