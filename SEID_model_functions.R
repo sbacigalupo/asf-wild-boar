@@ -4,7 +4,7 @@
 ##
 #################################################################
 
-outbreak <- function(beta, beta_wbp,cull_effort){
+outbreak <- function(beta, beta_wbp,base_cull_effort,outbreak_cull_effort){
   # Set up model parameters ------------------------------------------------------------
   
   #Set up numbers
@@ -25,9 +25,9 @@ outbreak <- function(beta, beta_wbp,cull_effort){
   
   # Initial conditions
   init_pop_s <- rep(0,n.patch)
-  init_pop_s[1] <- 1200 # Number of susceptible in forest
-  init_pop_s[2] <- 240 # Number of susceptible at border
-  init_pop_s[3] <- 60  # Number of susceptible outside forest
+  init_pop_s[1] <- 800 # Number of susceptible in forest
+  init_pop_s[2] <- 160 # Number of susceptible at border
+  init_pop_s[3] <- 40  # Number of susceptible outside forest
   
   init_pop_e <- rep(0,n.patch)
   init_pop_e[1] <- 0  # Number of pre-infectious
@@ -137,22 +137,31 @@ outbreak <- function(beta, beta_wbp,cull_effort){
     new_total[,"I"] <- pmax(new_total[,"I"] + E_to_I - I_to_death,0)
     new_total[,"D"] <- pmax(new_total[,"D"] + I_to_death,0)
     
-    ################### SG EDITED FROM HERE
-    # Births and deaths into different compartments
     
     # Density dependent birth and death rates
     birth_rate <- pmax(births_per_capita - a*growth_rate*colSums(new_total[,1:3])/carrying_capacity,0) #SB amended to ensure >0
     death_rate <- deaths_per_capita + (1-a)*growth_rate*colSums(new_total[,1:3])/carrying_capacity
     
-    cull_rate <- (pmax(birth_rate - death_rate,0))*cull_effort # base cull rate (pop~1500)*change in cull effort
+    ranger_cull_rate <- c(3, 0, 0)/sum(c(init_pop_s[1],init_pop_s[2] ,init_pop_s[3] )) # cull rate from forestry england data
+    
+    excess_death_rate <- c(2, 3, 5)/sum(c(init_pop_s[1],init_pop_s[2] ,init_pop_s[3] )) # excess deaths needed to maintain population ~1000
+    
+    # if ASFV deaths < 20% starting population use base cull effort
+    # if ASFV deaths > 20%, assume disease detected and implement(increased) outbreak level cull effort
+    if ((new_total[,"D"]) < (0.2*(sum(c(init_pop_s[1],init_pop_s[2] ,init_pop_s[3]))))
+        ){
+      untimely_death_rate <- (ranger_cull_rate*base_cull_effort)+excess_death_rate
+    } else {
+      untimely_death_rate <- (ranger_cull_rate*outbreak_cull_effort)+excess_death_rate
+    } # end else
+    
     
     new_births_S <- rpois(n_population, lambda = birth_rate*colSums(new_total[,1:3])) #SB amended
     
-    new_deaths_S <- rpois(n_population, lambda = (death_rate+cull_rate)*new_total[,"S"]) #SB amended
-    new_deaths_E <- rpois(n_population, lambda = (death_rate+cull_rate)*new_total[,"E"]) #SB amended
-    new_deaths_I <- rpois(n_population, lambda = (death_rate+cull_rate)*new_total[,"I"]) #SB amended
+    new_deaths_S <- rpois(n_population, lambda = (death_rate+untimely_death_rate)*new_total[,"S"]) #SB amended
+    new_deaths_E <- rpois(n_population, lambda = (death_rate+untimely_death_rate)*new_total[,"E"]) #SB amended
+    new_deaths_I <- rpois(n_population, lambda = (death_rate+untimely_death_rate)*new_total[,"I"]) #SB amended
     
-    ################### SG EDITED TO HERE
     # might need to add new growth rate for next iteration based on actual difference in rates
     
     # Store new populations
@@ -277,9 +286,9 @@ outbreak <- function(beta, beta_wbp,cull_effort){
   
   
   
-  plot_individual_run <- function(cull_effort, beta_interspecies, beta, n_run){
+  plot_individual_run <- function(base_cull_effort, outbreak_cull_effort, beta_interspecies, beta, n_run){
     
-    pop_trace <- store_scenarios[cull_effort, beta_interspecies, beta, n_run,,,]
+    pop_trace <- store_scenarios[base_cull_effort, outbreak_cull_effort, beta_interspecies, beta, n_run,,,]
     
     max_time <- length(pop_trace[,"forest","S"])
     n.state <- length(pop_trace[1,"forest",])
@@ -350,7 +359,7 @@ outbreak <- function(beta, beta_wbp,cull_effort){
       for(ee in 1:n.patch){
         lines(pop_trace[,ee,"prob_wb_p"],col=col_pick_patch[[ee]])
       }
-      mtext(paste0("Cull Effort=",cull_effort,",   Interspecies Transmission=", beta_interspecies,",    Beta =",beta,",   Run ",n_run), line = -1, cex = 0.85, outer = TRUE)
+      mtext(paste0("Base Cull Effort=",base_cull_effort,"   Outbreak Cull Effort=",outbreak_cull_effort,"   Interspecies Transmission=", beta_interspecies,",    Beta =",beta,",   Run= ",n_run), line = -1, cex = 0.85, outer = TRUE)
     }
   }
   
@@ -361,18 +370,19 @@ outbreak <- function(beta, beta_wbp,cull_effort){
 #----------------------------------------------------------------
   
   
-plot_median_outbreak <- function(cull_effort, beta_interspecies, beta){
+plot_median_outbreak <- function(base_cull_effort, outbreak_cull_effort, beta_interspecies, beta){
     
-    scenario <- store_scenarios[cull_effort, beta_interspecies, beta,,,,]
+    scenario <- store_scenarios[base_cull_effort, outbreak_cull_effort, beta_interspecies, beta,,,,]
     
-    max_time <- length(store_scenarios[1,1,1,1,,"forest","S"])
-    n.state <- length(store_scenarios[1,1,1,1,1,"forest",])
-    n.patch <- length(store_scenarios[1,1,1,1,1,,"S"])
+    max_time <- length(store_scenarios[1,1,1,1,1,,"forest","S"])
+    n.state <- length(store_scenarios[1,1,1,1,1,1,"forest",])
+    n.patch <- length(store_scenarios[1,1,1,1,1,1,,"S"])
     patchNames=c("forest","border","outside")
     stateNames=c("S","E","I","D","prob_wb_wb","prob_wb_p")
     beta_names <- c("0.7","1","1.3","1.6","1.9","2.2")
     beta_interspecies_names <- c("1/30","7/30","14/30") # median visitation rate, maximum visitation rate, upper 95% CI visitation rate
-    cull_names <- c("none","cull_rate","1.5*cull_rate","2*cull_rate")
+    base_cull_names <- c("none","cull_rate","2*cull_rate")
+    outbreak_cull_names <- c("none","cull_rate","2*cull_rate","5*cull_rate","10*cull_rate","20*cull_rate")
     
     store_medians <- array(dim=c(max_time,n.patch,n.state),dimnames=list(NULL,patchNames,stateNames))
     
@@ -391,7 +401,7 @@ plot_median_outbreak <- function(cull_effort, beta_interspecies, beta){
     col_pick_patch <- list("darkgreen","brown","orange")
     
     
-    {plot(store_scenarios[cull_effort,beta_interspecies,beta,1,,,],col="white", 
+    {plot(store_scenarios[base_cull_effort,outbreak_cull_effort,beta_interspecies,beta,1,,,],col="white", 
           main = "Wild boar numbers in the forest", xlab = "Days", ylab = "Number of individuals", 
           xlim=c(0,max_time),ylim=c(1,max(store_medians[,"forest",]))
     )
@@ -450,7 +460,7 @@ plot_median_outbreak <- function(cull_effort, beta_interspecies, beta){
       for(ee in 1:n.patch){
         lines(store_medians[,ee,"prob_wb_p"],col=col_pick_patch[[ee]])
       }
-      mtext(paste0("Cull Effort=",cull_effort,",    Interspecies Transmission=", beta_interspecies,",    Beta =",beta), line = -1, cex = 0.85, outer = TRUE)
+      mtext(paste0("Base Cull Effort=",base_cull_effort,"   Outbreak Cull Effort=",outbreak_cull_effort,",    Interspecies Transmission=", beta_interspecies,",    Beta =",beta), line = -1, cex = 0.85, outer = TRUE)
     }
   }
   
