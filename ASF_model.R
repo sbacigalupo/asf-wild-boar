@@ -14,7 +14,7 @@ wdir <- getwd()
 # Run simulation model ----------------------------------------------
 # For each function, outputs are saved in 'dir_pick' directory.
 
-n_run_pick <- 10 # model iterations
+n_run_pick <- 250 # model iterations
 
 
 # Load model functions
@@ -89,20 +89,18 @@ for(nn in 1:length(beta_interspecies_range)){
       beta = beta_range[mm]/1000,
       beta_wbp = beta_interspecies_range[nn]/1000
     )
-    store_scenarios[pp,qq, nn,mm,ii,,,] <- model_ii
+    store_scenarios[pp,qq,nn,mm,ii,,,] <- model_ii
     } # End loop runs
   } # End loop beta
 } # End loop beta_interspecies
   }# End loop outbreak cull
 } # End loop cull
   
-
-
 # Check debugs
 model_ii[,"forest","S"]
 
-store_scenarios[2,2,3,2,1:6,,"S"]
-store_scenarios["cull_rate","7/30","1.3",2,1:50,,"I"]
+store_scenarios[2,1,2,3,1,1:6,,"S"]
+store_scenarios["cull_rate","20*cull_rate","1/30","2.2",1,365,"forest","S"]
 
 
 
@@ -636,7 +634,7 @@ for (hh in 1:length(beta_range)){
 } # end loop base cull range
 
 
-write.csv(store_outputs,paste0("store_outputs10runs.csv"))
+write.csv(store_outputs,paste0("store_outputs_250runs.csv"))
 
 
 #################################################################
@@ -656,19 +654,19 @@ plot_outbreak(
 
 plot_individual_run(
   base_cull_effort = "cull_rate",
-  outbreak_cull_effort = "cull_rate",
+  outbreak_cull_effort = "20*cull_rate",
   beta_interspecies = "1/30",
-  beta = "0.7",
-  n_run = 2 # run 14 of cull rate, 1/30,0.7 is no_outbreak
+  beta = "1.6",
+  n_run = 1 # run 14 of cull rate, 1/30,0.7 is no_outbreak
 )
 
 # Plot median run for particular scenario
 
 plot_median_outbreak(
-  base_cull_effort = "none",
+  base_cull_effort = "cull_rate",
   outbreak_cull_effort = "20*cull_rate",
-  beta_interspecies = "1/30",
-  beta = "0.7"
+  beta_interspecies = "14/30",
+  beta = "1.6"
 )
 
 
