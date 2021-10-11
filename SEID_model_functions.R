@@ -148,12 +148,18 @@ outbreak <- function(beta, beta_wbp,base_cull_effort,outbreak_cull_effort){
     
     # if ASFV deaths < 20% starting population use base cull effort
     # if ASFV deaths > 20%, assume disease detected and implement(increased) outbreak level cull effort
-    if ((new_total[,"D"]) < (0.2*(sum(c(init_pop_s[1],init_pop_s[2] ,init_pop_s[3]))))
+    
+    if(tt>14){
+    if ((new_total["forest","D"]) > (0.2*(init_pop_s[1])) & 
+        (c_trace_tab[tt-14,"forest","D"]) < (0.2*(init_pop_s[1]))
         ){
-      untimely_death_rate <- (ranger_cull_rate*base_cull_effort)+excess_death_rate
-    } else {
       untimely_death_rate <- (ranger_cull_rate*outbreak_cull_effort)+excess_death_rate
+    } else {
+      untimely_death_rate <- (ranger_cull_rate*base_cull_effort)+excess_death_rate
     } # end else
+    }else {
+      untimely_death_rate <- (ranger_cull_rate*base_cull_effort)+excess_death_rate
+      }
     
     
     new_births_S <- rpois(n_population, lambda = birth_rate*colSums(new_total[,1:3])) #SB amended
@@ -294,7 +300,7 @@ outbreak <- function(beta, beta_wbp,base_cull_effort,outbreak_cull_effort){
     n.state <- length(pop_trace[1,"forest",])
     n.patch <- length(pop_trace[1,,"S"])
     
-    par(mfrow=c(3,2))
+    par(mfrow=c(3,2)) # par(mfrow=c(1,1),mar=c(4,4,1,1),las=1)
     
     
     col_pick_states <- list("blue","orange","red","black")
